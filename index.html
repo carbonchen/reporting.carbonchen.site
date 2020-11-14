@@ -1,0 +1,413 @@
+<?php
+  session_start();
+  if (isset($_SESSION["admin_auth"]) && $_SESSION["admin_auth"] == true) {
+    header("Location: /index-admin.php");
+    exit();
+  }
+  if (!isset($_SESSION["basic_auth"]) || $_SESSION["basic_auth"] != true) {
+    header("Location: /login.php");
+    exit();
+  }
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Basic User</title>
+
+  <script src="https://cdn.zingchart.com/zingchart.min.js"></script>
+  <script src="https://cdn.zinggrid.com/zinggrid.min.js" defer></script>
+  <style>
+    #pies {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+    }
+  </style>
+</head>
+
+<body>
+  <nav style="text-align:right; font-size:20px">
+    <a href="/logout.php">Logout</a>
+  </nav>
+  <h1>Welcome, <?php echo $_SESSION["username"] ?></h1>
+
+  <script>
+    <?php 
+      $mysqli = new mysqli("localhost", "root", "Carbon742!@#", "hw3");
+      if (mysqli_connect_errno()) {
+          printf("Connect failed: %s\n", mysqli_connect_error());
+          exit();
+      }
+
+      $initialBrowserData = [];
+      if ($result = $mysqli->query("SELECT * FROM initialBrowserData")) {
+        $initialBrowserData = $result->fetch_all(MYSQLI_ASSOC);
+        $result->close();
+      }
+
+      $visits = mysqli_query($mysqli, "SELECT * FROM initialBrowserData");
+      $lcp = mysqli_query($mysqli, "SELECT * FROM lcp");
+      $fid = mysqli_query($mysqli, "SELECT * FROM fid");
+      $cls = mysqli_query($mysqli, "SELECT * FROM cls");
+    ?>
+    // grid coding
+    var initialBrowserDataValues = <?php echo json_encode($initialBrowserData) ?>;
+
+    // calendar coding
+    var visitsData = [<?php
+      while($info=mysqli_fetch_array($visits))
+      echo '"'.$info[ 'created_at' ].'",';
+    ?>];
+    for (let i = 0; i < visitsData.length; i++) {
+      visitsData[i] = visitsData[i].substring(0,10);
+    }
+    var calendarVals = [];
+    for (let i = 0; i < visitsData.length; i++) {
+      var currentDay = visitsData[i];
+      var currentVisits = 1;
+      for (let j = i + 1; j < visitsData.length; j++) {
+        if (visitsData[j] == currentDay) {
+          currentVisits++;
+          i++;
+        }
+        else {
+          break;
+        }
+      }
+      var dayArray = [currentDay, currentVisits];
+      calendarVals.push(dayArray);
+    }
+
+    //pie charts coding
+    var lcpData = [<?php
+      while($info=mysqli_fetch_array($lcp))
+      echo '\''.$info['vitalsScore'].'\''.',';
+      ?>];
+    var fidData = [<?php
+      while($info=mysqli_fetch_array($fid))
+      echo '\''.$info['vitalsScore'].'\''.',';
+      ?>];
+    var clsData = [<?php
+      while($info=mysqli_fetch_array($cls))
+      echo '\''.$info['vitalsScore'].'\''.',';
+      ?>];
+
+    var lcpGood = 0;
+    var lcpNeedsImprovement = 0;
+    var lcpPoor = 0;
+    var fidGood = 0;
+    var fidNeedsImprovement = 0;
+    var fidPoor = 0;
+    var clsGood = 0;
+    var clsNeedsImprovement = 0;
+    var clsPoor = 0;
+
+    for (let i = 0; i < lcpData.length; i++) {
+      if (lcpData[i] == 'good') {
+        lcpGood++;
+      }
+      else if (lcpData[i] == 'poor') {
+        lcpData++;
+      }
+      else {
+        lcpNeedsImprovement++;
+      }
+    }
+    for (let i = 0; i < fidData.length; i++) {
+      if (fidData[i] == 'good') {
+        fidGood++;
+      }
+      else if (fidData[i] == 'poor') {
+        fidPoor++;
+      }
+      else {
+        fidNeedsImprovement++;
+      }
+    }
+    for (let i = 0; i < clsData.length; i++) {
+      if (clsData[i] == 'good') {
+        clsGood++;
+      }
+      else if (clsData[i] == 'poor') {
+        clsPoor++;
+      }
+      else {
+        clsNeedsImprovement++;
+      }
+    }
+
+    <?php
+      $mysqli->close();
+    ?>
+  </script>
+
+<div id='myChart'></div>
+
+  <zing-grid id="initialBrowserData"
+    editor contextmenu
+    caption="Initial Browser Data per Page Visitor"
+    sort
+    search
+    pager
+    page-size="5"
+    layout="row"
+    viewport-stop
+    >
+  </zing-grid>
+
+  <section id="pies">
+    <figure id="lcp_pie"></figure>
+    <figure id="fid_pie"></figure>
+    <figure id="cls_pie"></figure>
+  </section>
+
+  <script>
+    document.querySelector('#initialBrowserData').data = initialBrowserDataValues;
+
+    zingchart.render({
+      id: "lcp_pie",
+      data: {
+        type: 'pie',
+        title: {
+          text: "Largest Contentful Paint (LCP)"
+        },
+        legend: {
+          x: "70%",
+          y: "12%",
+          'draggable': true,
+          'border-width': 1,
+          'border-color': "gray",
+          'border-radius': "5px",
+          header: {
+            text: "Legend",
+            'font-family': "Georgia",
+            'font-size':12,
+            'font-color': "#3333cc",
+            'font-weight': "normal"
+          },
+          marker: {
+            type: "circle"
+          },
+          'toggle-action': "remove",
+          'minimize': true,
+          'icon': {
+            'line-color': "#9999ff"
+          },
+        },
+        plotarea: {
+          'margin-right': "15%",
+          'margin-top': "0%"
+        },
+        plot: {
+          'value-box': {
+            'font-size':15,
+            'font-weight': "normal",
+            placement: "out"
+          }
+        },
+        series: [
+          {
+            values: [lcpGood],
+            text: 'good',
+            'background-color': "green"
+          },
+          {
+            values: [lcpNeedsImprovement],
+            text: 'needs improvement',
+            'background-color': "orange"
+          },
+          {
+            values: [lcpPoor],
+            text: 'poor',
+            'background-color': "red"
+          }
+        ],
+        labels: [{
+          x: "60%",
+          y: "80%",
+          text: "Generate Report",
+          color: 'blue',
+          'text-decoration': 'underline',
+          url: "https://reporting.carbonchen.site/metric_reports/lcp.php",
+          'font-size': 20,
+        }]
+      }
+    });
+
+    zingchart.render({
+      id: "fid_pie",
+      data: {
+        type: 'pie',
+        title: {
+          text: "First Input Delay (FID)"
+        },
+        legend: {
+          x: "70%",
+          y: "12%",
+          'draggable': true,
+          'border-width': 1,
+          'border-color': "gray",
+          'border-radius': "5px",
+          header: {
+            text: "Legend",
+            'font-family': "Georgia",
+            'font-size':12,
+            'font-color': "#3333cc",
+            'font-weight': "normal"
+          },
+          marker: {
+            type: "circle"
+          },
+          'toggle-action': "remove",
+          'minimize': true,
+          'icon': {
+            'line-color': "#9999ff"
+          },
+        },
+        plotarea: {
+          'margin-right': "15%",
+          'margin-top': "0%"
+        },
+        plot: {
+          'value-box': {
+            'font-size':15,
+            'font-weight': "normal",
+            placement: "out"
+          }
+        },
+        series: [
+          {
+            values: [fidGood],
+            text: 'good',
+            'background-color': "green"
+          },
+          {
+            values: [fidNeedsImprovement],
+            text: 'needs improvement',
+            'background-color': "orange"
+          },
+          {
+            values: [fidPoor],
+            text: 'poor',
+            'background-color': "red"
+          }
+        ],
+        labels: [{
+          x: "60%",
+          y: "80%",
+          text: "Generate Report",
+          color: 'blue',
+          'text-decoration': 'underline',
+          url: "https://reporting.carbonchen.site/metric_reports/fid.php",
+          'font-size': 20,
+        }]
+      }
+    });
+
+    zingchart.render({
+      id: "cls_pie",
+      data: {
+        type: 'pie',
+        title: {
+          text: "Cumulative Layout Shift (CLS)"
+        },
+        legend: {
+          x: "70%",
+          y: "12%",
+          'draggable': true,
+          'border-width': 1,
+          'border-color': "gray",
+          'border-radius': "5px",
+          header: {
+            text: "Legend",
+            'font-family': "Georgia",
+            'font-size':12,
+            'font-color': "#3333cc",
+            'font-weight': "normal"
+          },
+          marker: {
+            type: "circle"
+          },
+          'toggle-action': "remove",
+          'minimize': true,
+          'icon': {
+            'line-color': "#9999ff"
+          },
+        },
+        plotarea: {
+          'margin-right': "15%",
+          'margin-top': "0%"
+        },
+        plot: {
+          'value-box': {
+            'font-size':15,
+            'font-weight': "normal",
+            placement: "out"
+          }
+        },
+        series: [
+          {
+            values: [clsGood],
+            text: 'good',
+            'background-color': "green"
+          },
+          {
+            values: [clsNeedsImprovement],
+            text: 'needs improvement',
+            'background-color': "orange"
+          },
+          {
+            values: [clsPoor],
+            text: 'poor',
+            'background-color': "red"
+          }
+        ],
+        labels: [{
+          x: "60%",
+          y: "80%",
+          text: "Generate Report",
+          color: 'blue',
+          'text-decoration': 'underline',
+          url: "https://reporting.carbonchen.site/metric_reports/cls.php",
+          'font-size': 20,
+        }]
+      }
+    });
+  </script>
+
+  <script defer>
+    // calendar chart
+    var myConfig = {
+      type: 'calendar',
+      title: {
+        text: 'Page Visits per Day',
+        'font-size': 25
+      },
+      options: {
+        startMonth: 8,
+        endMonth: 9,
+        year: {
+          text: '2020'
+        },
+        values: calendarVals
+      },
+      plotarea: {
+        marginTop: '15%',
+      }
+    };
+    zingchart.loadModules('calendar', function(){   
+      zingchart.render({ 
+        id : 'myChart', 
+        data : myConfig, 
+        height: 400, 
+        width: '100%'
+      });
+    });
+  </script>
+
+</body>
+
+</html>
